@@ -1,0 +1,12 @@
+ERROR LOG:
+Er1, L4 C25 - INTERPRETER ERROR: uninitialised variable used
+NIL HAS ZERO LENGTH
+(1) DOESN'T HAVE ZERO LENGTH
+A HAS ZERO LENGTH
+(2)
+L1 has Car 2
+(3 4 5)
+(1 2)
+((1 2) 3 4 5)
+Interpreter failed
+Parsed OK

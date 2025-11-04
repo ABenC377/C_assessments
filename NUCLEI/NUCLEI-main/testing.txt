@@ -1,0 +1,182 @@
+To seperate my concerns, I've got three pairs of .c and .h file: the nuclei.c file, which has all of the parser and interpretter; lisp.c, which has the various lisp functions (taken and slightly adapted from CAR/CDR); and lexical_parser.c, which has the functions for tokenising a .ncl file, and is needed for my extension.  Each of these has been tested seperately.  
+
+
+___parser testing___
+
+Most of the functions in this section of the code are used in the recursive descent parser, and so are called recursively from one another.  For these, I have used a specific testing pattern.  However, there are also some stand-alone helper functions, which can be tested discretely.  The testing of these is discussed below teh recurscive functions.
+
+I've adopted a 'bottom-up' approach to testing the recursive functions in this part of the code.  Because the entire parser is a recursive call tree, there is no way to test the top functions (i.e., the functions that is called first) without calling all the other functions.  This would mean that testing the top functions straight away would require testing all possible permutations of the lower recursive functions (big O of (n!) -- clearly not feasible).  Therefore, my parser_test() function first assert tests the terminal functions (e.g., the functions that handle variables, strings and literals) because these have a very limited functionality - usually only returning a Tree node if the correct token is found or an ERROR node otherwise.  When we are confident that these work as intended we can take it as a given and test the functions that call them without testing the full functionality of the lower functions.  We continue working up in this way until we reach to top function.  The full order of this explained below.
+
+Structure of the recursive call tree:
+
+    descend_recursively()
+        |
+        v
+    handle_INSTRCTS()
+        |
+        v
+    handle_INSTRCT() 
+        |
+        v
+    handle_FUNC()
+        |-----------------------------------------------------------------------------------------------
+        |                                                       |                   |                   |
+        v                                                       v                   v                   v
+ -> handle_RETFUNC()                                        handle_LOOP()*      handle_IF()*        handle_IOFUNC()
+|       |---------------------------------------     -----------|-------------------|                   |
+|       |                   |                   |   |                                        ---------------
+|       v                   v                   v   v                                       |               |
+|   handle_LISTFUNC()   handle_INTFUNC()    handle_BOOLFUNC()                               v               v
+|       |                   |                   |                           |-----------handle_SET()    handle_PRINT()#
+|       --------------------------------------------------------------------|               |               |
+|                           |                                                               |               |
+|                           v                                                               v               v
+ -----------------------handle_LIST()-------------------------------------------------->handle_VAR()    handle_STRING()
+                        |           |
+                        v           v
+                    handle_NIL()    handle_LITERAL()
+
+*indicates an unshown call to handle_INSTRCTS()
+#indicates an unshown call to handle_LIST()
+
+As can be seen from the above, the base functions are handle_NIL(), handle_LITERAL, handle_VAR, and handle_STRING()
+
+handle_NIL()
+    This function does one of two things: (1) if the token_node pointer directs to a t_nil type token, the function returns a NIL type tree node, and move the token_node pointer on by one; or (2) otherwise, the function returns a NULL pointer, does not move the pointer on, and adds an error to the error log.
+    Therefore, I have tested both of these eventualities, first with a t_nil token, and then with a non-'t_nil' token (I chose t_literal, so that I didn't have to reset before the next assert testing).  
+    For both of these, I have tested all of the variables that should have changed/remained the same, and confirmed that they have with assert testing.
+
+handle_LITERAL(), handle_VAR(), and handle_STRING()
+    These functions do the same binary thing as handle_NIL(), when in parsing mode (i.e., neither INTERP or EXT defined).  Therefore, these are tested in the same way in the parsing testing - i.e., run with a token of the correct type to make sure that they create the correct tree node, and move the pointer on; and an incorrect type to make sure that they add an error to the log.
+    
+The next level up the recursive tree, it becomes a bit more complicated, because handle_LIST() can call handle_RETFUNC() (much higher up the tree), and is called by both handle_SET() and handle_PRINT().  Therefore, for now, we are going to take it on faith that handle_RETFUNC() works as intended.  Of course, we will test it later on in order to confirm this.
+
+Therefore, we are next testing handle_LIST().  
+    handle_LIST() is a function that does a lot of heavy lifting, because the grammar for <LIST> allows four diecrete options, all of which need to be handled differently.  In brief, this function works out which of the four branches to take, and then calls a function to handle that branch (or returns an error if it is none of those four branches).  therefore, I have tested this function against tokens for each of VAR, LITERAL and NIL, as well as a RETFUNC, and an incorrect token.  I have tested that this returns the correct tree node for each of these eventualities.
+
+After handle_LIST(), the next ones up are handle_PRINT(), handle_SET(), handle_BOOLFUNC(), handle_INTFUNCT() and handle_LISTFUNCT().
+
+handle_PRINT()
+    This function checks that the current token is PRINT, and (if it is) either calls handle_STRING() or handle_LIST(), depending on whether the token after PRINT is t_string or not.  If the current token is not PRINT, then it adds an error and returns an ERROR node.  Therefore, This has been tested to confirm that these three modes of operation are correct - against a print->string sequence, a print->non-string sequence, and a non-print sequence of tokens.
+
+handle_SET()
+    This function checks that the current token is SET.  If it isn't then it returns an ERROR node, and adds an error message.  If it is, then returns a SET node, with a VAR node at child1 and a LIST node at child2.  Therefore, there are two eventualities to test here: 1) the first token is set, and 2) the first token is not set.  Both modes of operation are shown to work correctly in the assert testing.
+    
+handle_BOOLFUNC()
+    This function checks that the current token is one of LESS, GREATER or EQUAL.  If it is, then it returns a BOOLFUNC node with LIST nodes at child1 and child2.  If it isn't, then it retusn an ERROR node and adds an error message.  I have tested this in each of the four intended runnning situations, and used assert testing to confirm that the output is as intended.  Further, this function sets the 'func_type' property of the BOOL node to either greater, less or equal - this has been assert tested as well.
+
+handle_INTFUNC()
+    This function checks whether the immediate token is PLUS or LENGTH.  If it is, and the token type is PLUS, then it returns an INT node (of type t_plus) with a LIST node on both child1 and child2.  If it isn't PLUS, then it returns an INT node (of type t_length) with a LIST node on child1.  If the immediate token is neither PLUS not LENGTH, then the function returns an ERROR node, and adds an error to the log.  As with handle_BOOLFUNC(), handle_INTFUNC() also sets the type of the returned tree node.  This has been assert tested to confirm that these three possible modes of operation work as intended.  
+    
+handle_LISTFUNC()
+    This function returns a LISTFUNC node if the current token is either CAR, CDR or CONS.  Otherwise, it returns an ERROR node.  Assert testing confirms that each of these four modes of operation works as intended.
+    
+The next layer of functions is handle_IOFUNC() and handle_RETFUNC() (the later of which we have taken the correctness of for granted up until now).  
+
+handle_RETFUNC()
+    This function returns a RETFUNC node with a child1 that is either a LISTFUNC, INTFUNC or BOOLFUNC, depending on what the current tokens are.  If the current tokens are none of the above, then this function returns an ERROR node and adds an error message to the log.  This has been assert tested to confirm that, when presented with a LISTFUNC, INTFUNC, or BOOLFUNC it produces the right type of tree node, and when presented with none of the above, it returns an error, as intended.
+    
+handle_IOFUNC()
+    this function calls handle_SET() if the current token is t_set, or handle_PRINT() if the current token is t_print.  Otherwise, it returns an ERROR node, and adds an error message to the log.  Assert testing confirms that each of these three modes of operation works as intended.
+
+After this, there is another complication - each of handle_LOOP() and handle_IF() call handle_INSTRCTS().  As with handle_RETFUNC() previously, this is higher up the recursive chain than these functions which are calling it.  Therefore, we are again going to (for the time being) trust that it works as it should before demonstrating it with assert testing later on.  For now, we will use 't_l_parenthesis->t_print->t_literal->t_r_parenthesis->t_r_parenthesis' as the sequence of tokens that we know are a valid INSTRCTS (they should produce an INSTRCTS->INSTRCT->FUNC->IOFUNC->PRINT->LIST->LITERAL chain of tree nodes).  
+
+handle_LOOP()
+    This function does some heavy lifting because of the number of tokens in a LOOP.  It checks for the presence of a WHILE token and a ( token (in that order).  If either are missing, it returns an ERROR node, and adds an error to the log.  If this is passed, it adds a BOOL node to child1, and continues checking for ) and ( tokens (in that order).  If either of these are missing, it returns an ERROR node.  If this is passed, then it adds an INSTRCTS node to child2.  assert testing shows that this series of tokens results in a valid LOOP node being returned.  Otherwise, if the series of WHILE and parentheses is incorrect, it returns an ERROR node.  I.e., the assert testing shows that this function works as it should (assuming that handle_INSTRCTS(), which it calls, is functioning correctly).
+
+handle_IF()
+    like handle_LOOP(), this function also does some heavy lifting due to the number of tokens involved in an IF.  Specifically, it should check for IF and ( (returning ERROR if not present), then add BOOLFUNC to child1, then check for ) and ( (returing ERROR if not present), then add INSTRCS to child2, then check for ( (returingin ERRO if not present), and finally adding INSTRCTS to child 3.  Assert testing shows that a correct series of tokens results in a valid IF node being returned.  Additionally, assert testing shows that the absence of any one of the tokens results in an ERROR being returned.  Therefore, assert testing shows that this function works as intended.
+
+After this, there is a fairly linear route to the top of the recursive tree.  We will be testing, in this order, handle_FUNC(), handle_INSTRCT(), handle_INSTRCTS(), and descend_recursively().
+
+handle_FUNC()
+    This is a simple redirecting function.  It checks whether the next tokens are a RETFUNC, IOFUNC, IF, or LOOP, and then calls the respective handle_... function.  If the tokens are none of the above, then it returns and ERROR node.  Assert testing shows that this function works as it should in its five use cases.
+
+handle_INSTRCT()
+    This function should check for an opening parenthesis (returning ERROR node if not), then add a FUNC to child1, then check for a closing parenthesis (returning an ERROR node if not).  Assert testing shows that this function fails if either of the parentheses are missing, and works otherwise.  I.e., this functions functions correctly.
+
+handle_INSTRCTS()
+    This function should return NULL if there is a closing parenthesis (this indicates that the previous INSTRCTS had no follow-on, so NULL is sufficient here).  Otherwise, it should check whether the following tokens constitute an INSTRCT followed by an INSTRCTS.  If they do, then it should return an INSTRCTS node with an INSTRCT node at child1 and (if it isn't a closing parenthesis INSTRCTS), another INSTRCTS node at child2.  If not, then it returns an ERROR node.  Assert testing shows that each of these three behaviours is correctly achieved by the function.
+
+descend_recursively()
+    This is possible the simplest of the recursive descent functions.  It checks for an opening parenthesis.  If it is there, then it returns a PROG node with an INSTRCTS node at child1.  If not, then it returns an ERROR node.  Assert testing confirms both of these modes work correctly.
+
+Additionally, the helper functions have been comprehensively assert tested as explained below 
+check_inputs()
+    This is a simple function, which does nothing if argc == 2, and throws an error otherwise.  because failure results in exit() being called (from withint throw_error()), there is no way to silently test this function.  However, its simplicity means that testing would be a bit superfluous - there is a single if statement in the functions.  One can glimpse at the function and be assured that it works as intended.
+    
+make_node()
+    Another fairly simple function - it allocates space for a Tree_node, assigns its type to the provided argument, and then returns a pointer to the node.
+    This has been assert tested with a number of different grammar_types, and it is confirmed that the return value is both a new Tree_node and is of the correct type.
+
+there are also some printing functions, which can't be silently tested for obvious reasons.  These functions are print_tree() and print_tree_node().  These were only used for debugging, and are kept in the codebase to assist with further development, if needed.  However, as they are not used in the normal functioning of the code, there is no need to test them.  print_log is another print function, which is used in the normal running of this code (when there is a parsing or interpretation error).  Because this is a printing function, there is no good way to test it.  However, 
+
+Further, there are the functions free_tree(), free_node() and free_log(), which are used to avoid memory leaks.  Because memory leaks can't be effectively assert tested, these have not been tested in the test() functions.  However, they are used in these functions (and the actual running of the program), and it can be seen from running the program in valgrind that there are no memory leaks.  Therefore, we can be confident that they work in freeing all memory in all of the assert tested cases (which are, for the reasons explained elsewhere in this document, comprehensively cover the complete usage of this code).
+
+
+
+___Lexer testing___
+
+The following functions are assert tested in the lexical_parse_test() function as described:
+- get_file_name()
+    This function takes argc and argv as inputs, and outputs the file name if one is provided as an argv argument.  To check this, it looks for an argument that has a '.' in a non-final position.  If there are more than one file names provided, then the function returns the first file name provided.  If there are no file names provided, then the function returns NULL.  To test this function, I have assert tested that it provides the frist correct file name when given sets of argv strings that contain a valid file name, and NULL when it there isn't a correct file name.
+    The argc and argv arguments for this function are passed directly from the command line, and so argc and argv should be consistent (i.e., there should be argc elements in argv).  Therefore, the function does not handle inconsistent arguments, and I have not tested its behavious with inconsistent arguments.
+
+- update_tokens()
+    This function takes in the list of tokens, automata, and a character as arguments.  The behaviour is dictated by the state of the automata - it is a large switch statement.
+    For the automata states start, in_literal and in_string, this function simply calls another handling function.  Therefore, to avoid duplication, the testing of this function for these cases is done in conjunction with the testing of the respective handling functions.
+    for the other automata states, the function checks whether the input character is the anticipated next character in a/the reserved word or not.  If it is, then it moves on to the next state.  Otherwise, it calls a function (add_previous_chars()) that retroactively handles the letters of the state knowing that it won't end as a reserved word.  I have tested these states by running through the anticipated sequence of characters to get to each of the reserved words and assert tested that these work.
+    For cases where an unexpected characters are provided, the testing is done in conjunction with the add_previous_chars function, to avoid duplication.
+
+- add_previous_chars()
+    This function is for backtracking when you have already recieved a number of letters of a reserved word (e.g., WHILE) and then recieved an unexpected character.  It does this by adding the first letter of the reserved word as a variable token to the token list, and then considering the following letters in order as if they were newly input characters.  To test this function, I checked that the function correctly adds the variable to a token list, and then seperately that it correctly adds the following characters (either as variables or as different reserved words).
+
+- make_and_add_simple_token()
+    This function makes a token of a given type, adds it to the tokens list, and resets the automata to its start state.  It only works for token types that don't have additional information (i.e., all but literal, string and variable token types).  I have tested this function against each of the simple token types to check that it successfully adds a token of that type to the token list.  This function is only ever called when a simple token is to be added, and so there is no need to test it with complex token type inputs.
+
+- handle_start_state()
+    This function checks the character that is provided from the file, and handles it correctly.  There are five types of valid characters according to the grammar of NUCLEI: 1) white space - this should be ignored; 2) parentheses - these are individual tokens and should be added to the token list; 3) a single quote - this signifies the beginning of a literal; 4) a double quote - this signifies the beginning of a string; and 5) a capitalised letter - this is either a variable or the beginning of a reserved word, and should be handled accordingly.  If the character is none of these, then the function adds an 'invalid' token to the token list.  To test this function, I have assert tested it with characters of each of the above types (including invalid) to ensure that they are handled correctly.
+    This function is only called from update_tokens(), when the automata is in the start state.  It is passed the tokens and automata arguments directly from the arguments of this higher function.  Therefore, we do not need to check that these arguments are valid, because this has been checked higher up.  Therefore, I have not tested for this.
+
+- add_variable_token()
+    This function adds a token of type variable to the token list.  The name of the variable (i.e., A-Z) is provided as an input.  I've tested this function against each possible varibale name to confirm that a correctly named token is added to the token list.  
+    This function is only called in add_previous_chars() and handle_start_state().  in add_previous_chars(), it is called in relation to the var argument, which is only ever a capitalised letter (see the switch statement in update_tokens()).  In handle_start_state(), this function is only called in the event of a character that is A-Z.  Therefore, we know that this function is only ever called with a name that is valid (i.e., A-Z).  Therefore, we do not need to handle incorrect names, and I have not tested for this.
+    Similarly, because the tokens and automata arguments of this function are always passed directly from the arguments of the functions that call it (i.e., add_previous_chars() and handle_start_state()), we know that they must be valid (otherwise the higher up functions would have failed).  Therefore, I have not tested for this.
+
+- handle_in_state()
+    This function is called when a character is recieved while the automata is in either the 'in_literal' or'in_string' state.  It checks whether the character is ending the literal/string (i.e., whether it it a single or double quote, respectively).  If it is ending the literal/string, then it adds the token to the token list.  Otherwise it adds the new character to the lexeme string of the token associated with the automata.  I have tested this function by running it in both 'in_literal' and 'in_string' states with both closing and non-closing characters, to make sure that the string is updated correctly, and that the token is added to the token list correctly.
+    Because this function is only called from update_tokens() when the automata state is either 'in_string' or 'in_literal' (see the switch statement in update_tokens()), I have not tested the function with non-intenedd automata states.  Further, the tokens and automata arguments are carried over directly from the update_tokens arguments, and so have already been checked.  Therefore, unintended values are not tested for this function.
+
+- add_token()
+    This function adds a token to the end of a token list.  I have tested it with tokens of every token type to ensure that it correctly adds the token to the token list, as well as providing it with a NULL token pointer to ensure that it simply leaves the token list as it.
+    add_token() is called from make_and_add_simple_token(), handle_start_state(), add_variable_token(), and handle_in_state().  In each of these functions, add_token() is passed its tokens argument directly from the tokens argument that was passed to them.  Therefore, this argument will always have been checked when add_token() is called, and so add_token() does not need to handle invalid token lists, and I have not tested that it does so.
+
+
+The following functions rely on command line arguments and reading from files, and so are not testable with quiet assert testing:
+- run_lexical_analyser()
+- get_tokens_from_file()
+
+The following functions are structure-specific print functions so are not testable with quiet assert testing (also, they are not used in the program, but are relics from debugging that are retained for future debugging):
+- print_tokens()
+- print_token()
+
+The following functions are used in the lexical_parse_test() function, but are not directly assert tested.  However, they free the memory allocated to the structures made for testing the other functions, and using Valgrind it is seen that running lexical_parse_test() does not result in any memory leaks.  Therefore, we can see that these functions work as intended:
+- free_token_list()
+- free_token_node()
+
+___extension testing___
+
+The following additional functions areused in the extension:
+
+add_error()
+    This function adds Errors to the log, and updates the meta data.  Assert testing demonstrates that it does add the correct Error to the next place in the error log, unless there are already 20 errors, in which case it flips the overlow flag.  Further, assert testing confirms that it correctly flips the parser/interpreter flag on the basis of the bool provided to the function.
+
+parser_fails()
+    This function should take a token and an error message, and update the log to have a new error with the line and col from the token, and the provided error message.  Further, it should return an ERROR node.  This functionality has been confirmed with assert testing - showing that the meassage, line and col are correctly carried through to the log, and that there is a correct output.
+    
+check_initialised()
+    This function checks a token against the varibakle list in a log, and sees if the entry for the given variable name is occupied or not.  If it isn, then it turns the Tree_node to an ERROR_NODE.  This functionality is confirmed by assert testing with both a varibale name that is occupied, and one that isn't
+
+___Lisp testing___
+
+The lisp functions are comprehensively assert tested in the test_lisp() function.  These assert tests are run against all of the functions therein, and show that these functions work as intended in all use cases.  These assert tests are well annotated in the test_lisp() function, to demonstrate their suitability.

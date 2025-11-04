@@ -1,0 +1,5 @@
+My extention.c file is based on the base assignment.  However, there are some additional flags which can be used to jazz things up.  '-animate' makes the program animate the search as it goes.  '-pretty' is an expansion of the '-show' flag, which makes the visualisation of the boards more attractive.
+
+My extension does NOT deal with multiple flags.  There is a heirachy of flags.  The order is '-animate' -> '-pretty' -> '-show'.  Therefore, if both '-DFS' and '-show' flags are used, only the '-DFS' tag will be actioned.
+
+My extension.c file does use the gnu '...'expansion in its switch case.  This is compatible with clang and GCC, though is not formally in the C language (not C11, and certainly not C99).  Therefore, when compiling this code, there will be a warning raised if using debugging flags.  However, this warning should be duly ignored.

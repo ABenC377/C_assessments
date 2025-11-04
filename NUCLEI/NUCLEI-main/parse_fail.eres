@@ -1,0 +1,5 @@
+ERROR LOG:
+Er1, L3 C49 - Expecting function in instruction
+Er2, L3 C49 - Expecting closing parenthesis after function in instruction
+YES
+Not parsed correctly
