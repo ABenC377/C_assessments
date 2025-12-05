@@ -2,6 +2,7 @@
 
 #define BIGSTR 100000
 
+int getBlockIndex(csa* c, int idx);
 bool getVal(block* b, int idx, int* val);
 int getValIndex(block* b, int idx);
 bool addNewBlock(csa* c, int idx, int val);
