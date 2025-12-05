@@ -54,6 +54,8 @@ bool addValToBlock(block* b, int idx, int val) {
 
 void csa_tostring(csa* c, char* s) {
   if (!c) return;
+  int startIndex = 0;
+  startIndex += snprintf(s + startIndex, BIGSTR - startIndex, "%d block%s", c->n, (c->n == 1) ? " " : ((c->n == 0) ? "s" : "s ")); 
   for (int i = 0; i < c->n; i++) printBlock(&(c->b[i]), s);
 }
 
