@@ -1,17 +1,13 @@
 #pragma once
-#include <assert.h>
-#include <limits.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <assert.h>
 #include <string.h>
+#include <limits.h>
 
 #define MSKLEN 64
-#ifndef BIGSTR
-#define BIGSTR 100000
-#endif
-
 typedef uint64_t mask_t;
 
 struct block {
@@ -55,17 +51,5 @@ void csa_foreach(void (*func)(int* p, int* acc), csa* c, int* ac);
 // Usage : csa_free(&c)
 // Frees up all space pointed to by c, then sets c to be NULL
 void csa_free(csa** l);
-
-int getVal(block* b, int idx);
-
-int getValIndex(block* b, int idx);
-
-bool addNewBlock(csa* c, int idx, int val);
-
-int offsets(const void* b1, const void* b2);
-
-bool addValToBlock(block* b, int idx, int val);
-
-void printBlock(block* b, char* s);
 
 void test(void);

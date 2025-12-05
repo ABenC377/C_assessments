@@ -1,17 +1,19 @@
 #include "csa.h"
 #include "mydefs.h"
 
-csa* csa_init(void) { return (csa*)calloc(1, sizeof(csa)); }
+csa* csa_init(void) { 
+  return (csa*)calloc(1, sizeof(csa)); 
+}
 
 bool csa_get(csa* c, int idx, int* val) {
   if (c->n == 0) return false;
   int blockIndex = 0;
   while (blockIndex < c->n && c->b[blockIndex].offset <= (unsigned int)(idx/(int)MSKLEN) * MSKLEN) blockIndex++;
-  return (c->b[--blockIndex].offset > (unsigned int)(idx/(int)MSKLEN) * MSKLEN) ? false : ((*val = getVal(&(c->b[blockIndex]), idx % MSKLEN)) || true);
+  return (c->b[--blockIndex].offset > (unsigned int)(idx/(int)MSKLEN) * MSKLEN) ? false : (getVal(&(c->b[blockIndex]), idx % MSKLEN, val));
 }
 
-int getVal(block* b, int idx) {
-  return ((b->msk & (1ull << idx)) == 0) ? 0 : b->vals[getValIndex(b, idx)];
+bool getVal(block* b, int idx, int* val) {
+  return ((b->msk & (1ull << idx)) == 0) ? false : ((*val = b->vals[getValIndex(b, idx)]) || true);
 }
 
 int getValIndex(block* b, int idx) {
@@ -52,7 +54,6 @@ bool addValToBlock(block* b, int idx, int val) {
 
 void csa_tostring(csa* c, char* s) {
   if (!c) return;
-  snprintf(s, BIGSTR, "%d block%s", c->n, (c->n == 1) ? " " : ((c->n == 0) ? "s" : "s "));
   for (int i = 0; i < c->n; i++) printBlock(&(c->b[i]), s);
 }
 

@@ -15,58 +15,58 @@ int main(void)
 
    test();
 
+   // Empty CSA
    csa_tostring(c, str);
-   assert(strcmp(str, "")==0 && "Empty csa should give empty string");
+   assert(strcmp(str, "")==0);
    c = csa_init();
-   assert(!csa_get(c, 0, &n) && "Empty csa should not get any value");
-   assert(!csa_get(c, 2, &n) && "Empty csa should not get any value");
+   assert(!csa_get(c, 0, &n));
+   assert(!csa_get(c, 2, &n));
    // First Add (csa[2]=25)
-   assert(csa_set(c, 2,  25) && "Should be able to add first value");
+   assert(csa_set(c, 2,  25));
    // Add csa[3]=30
-   assert(csa_set(c, 3,  30) && "Should be able to add second value");
+   assert(csa_set(c, 3,  30));
    // Add csa[63]=100
-   assert(csa_set(c, 63, 100) && "Should be able to add third value");
+   assert(csa_set(c, 63, 100));
+
    // Getters
-   assert(csa_get(c,  2, &n) && "Should be able to get first value");
-   assert(n==25 && "First value should be 25");
-   assert(csa_get(c,  3, &n) && "Should be able to get second value");
-   assert(n==30 && "Second value should be 30");
-   assert(csa_get(c, 63, &n) && "Should be able to get third value");
-   assert(n==100 && "Third value should be 100");
+   assert(csa_get(c,  2, &n));
+   assert(n==25);
+   assert(csa_get(c,  3, &n));
+   assert(n==30);
+   assert(csa_get(c, 63, &n));
+   assert(n==100);
    csa_tostring(c, str);
-   assert(strcmp(str, "1 block {3|[2]=25:[3]=30:[63]=100}")==0 &&
-          "String representation should match");
+   assert(strcmp(str, "1 block {3|[2]=25:[3]=30:[63]=100}")==0);
 
    // Use one whole block: csa[i]=i*10
    for(int i=0; i<64; i++){
-    assert(csa_set(c, i, i*10) && "Should be able to set full first block");
-    assert(csa_get(c, i, &n) && "Should be able to get value from full first block");
-    assert(n==i*10 && "Value from full first block should match expected");
+      assert(csa_set(c, i,  i*10));
+      assert(csa_get(c, i, &n));
+      assert(n==i*10);
    }
    // Clean Up
    csa_free(&c);
-   assert(c==NULL && "CSA should be NULL after free");
+   assert(c==NULL);
 
    //Let's do it all again, but with +200 higher indices
    c = csa_init();
    csa_tostring(c, str);
-   assert(strcmp(str, "0 blocks")==0 && "String representation should match for empty csa");
-   assert(csa_set(c, 202,  25) && "Should be able to add first value");
-   assert(csa_set(c, 203,  30) && "Should be able to add second value");
-   assert(csa_set(c, 263, 100) && "Should be able to add third value");
-   assert(csa_get(c, 202, &n) && "Should be able to get first value");
-   assert(n==25 && "First value should be 25");
-   assert(csa_get(c, 203,  &n) && "Should be able to get second value");
-   assert(n==30 && "Second value should be 30");
-   assert(csa_get(c, 263, &n) && "Should be able to get third value");
-   assert(n==100 && "Third value should be 100");
+   assert(strcmp(str, "0 blocks")==0);
+   assert(csa_set(c, 202,  25));
+   assert(csa_set(c, 203,  30));
+   assert(csa_set(c, 263, 100));
+   assert(csa_get(c, 202, &n));
+   assert(n==25);
+   assert(csa_get(c, 203,  &n));
+   assert(n==30);
+   assert(csa_get(c, 263, &n));
+   assert(n==100);
    csa_tostring(c, str);
    // 2 blocks, the first has 2 entries csa[202]=25 & csa[203]=30, and the 2nd
    // has 1 entry csa[263]=100
-   assert(strcmp(str, "2 blocks {2|[202]=25:[203]=30}{1|[263]=100}")==0 &&
-          "String representation should match");
+   assert(strcmp(str, "2 blocks {2|[202]=25:[203]=30}{1|[263]=100}")==0);
    csa_free(&c);
-   assert(c==NULL && "CSA should be NULL after free");
+   assert(c==NULL);
 
 #ifdef EXT
    // EXTENSION : foreach
@@ -104,7 +104,7 @@ int main(void)
    assert(strcmp(str, "1 block {1|[65]=60}")==0);
    assert(csa_delete(c, 65));
    csa_tostring(c, str);
-   assert(strcmp(str, "0 blocks") == 0);
+   assert(strcmp(str, "0 blocks")==0);
    // Don't need to do full csa_free() - only the
    // csa structure itself should be in use by now ...
    free(c);
